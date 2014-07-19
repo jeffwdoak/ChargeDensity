@@ -15,6 +15,7 @@ if len(sys.argv) > 3:
         a = ChargeDensity(str(sys.argv[3]))
 else:
     a = ChargeDensity("LOCPOT")
+a.unitcell.scale = 1.0
 den_z = a.integrate_z_density()
 z_pos = np.linspace(0,a.unitcell.cell_vec[2,2],len(den_z))
 macro_z = a.macro_mismatch(p1,p2)

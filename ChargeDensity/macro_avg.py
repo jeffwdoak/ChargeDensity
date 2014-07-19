@@ -16,9 +16,36 @@ else:
 if len(sys.argv) > 2:
     p1 = float(sys.argv[2])
 else:
-    p1 = a.unitcell.cell_vec[2,2]/float(10)
+    #p1 = a.unitcell.cell_vec[2,2]/float(10)
+    p1 = a.unitcell.scale
+a.unitcell.scale = 1.0
 den_z = a.integrate_z_density()
 z_pos = np.linspace(0,a.unitcell.cell_vec[2,2],len(den_z))
 macro_z = a.macro_avg_z(p1)
 for i in range(len(den_z)):
     print z_pos[i],den_z[i],macro_z[i]
+
+# Calculate bulk and vacuum average, assuming that the bulk is located in the
+# 1st half of the cell (along z) and the vacuum is in the second half of the
+# cell.
+bulk_start = 0.2
+bulk_stop = 0.3
+vac_start = 0.7
+vac_stop = 0.8
+bi = int(np.floor(bulk_start*len(den_z)))
+bf = int(np.floor(bulk_stop*len(den_z)))
+vi = int(np.floor(vac_start*len(den_z)))
+vf = int(np.floor(vac_stop*len(den_z)))
+
+bulk_avg = np.average(macro_z[bi:bf])
+bulk_std = np.std(macro_z[bi:bf])
+#bulk_center = macro_z[int(np.floor(0.25*len(den_z)))]
+vac_avg = np.average(macro_z[vi:vf])
+vac_std = np.std(macro_z[vi:vf])
+#vac_center = macro_z[int(np.floor(0.75*len(den_z)))]
+
+print
+print "Bulk_avg_(eV) Bulk_std_(eV) Vac_avg_(eV) Vac_std_(eV)"
+print bulk_avg,bulk_std,vac_avg,vac_std
+#print "Bulk_avg_(eV) Bulk_center_(eV) Vac_avg_(eV) Vac_center_(eV)"
+#print bulk_avg,bulk_center,vac_avg,vac_center

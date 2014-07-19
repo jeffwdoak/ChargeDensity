@@ -11,6 +11,11 @@ import sys
 class ChargeDensity():
     """
     Class to read in, store, and manipulate charge density files.
+    
+    Instance attributes:
+    self.unitcell - unitcell object of the POSCAR corresponding to the density
+    self.density  - density (charge or electrostatic potential) as a function of
+                    position in the unit cell
     """
 
     def __init__(self,input_=None,format_=None):
@@ -85,9 +90,31 @@ class ChargeDensity():
         ngx = len(self.density)
         ngy = len(self.density[0])
         ngz = len(self.density[0,0])
+        a = np.linalg.norm(self.unitcell.cell_vec[0])
+        b = np.linalg.norm(self.unitcell.cell_vec[1])
+        den_yz = trapz(self.density,dx=float(a/ngx),axis=0)/a
+        den_z = trapz(den_yz,dx=float(b/ngy),axis=0)/b
+        return den_z
+
+    def avg_density_vol(self):
+        """
+        Averages the density over the entire volume of the calculation cell.
+        """
+        from scipy.integrate import trapz
+        ngx = len(self.density)
+        ngy = len(self.density[0])
+        ngz = len(self.density[0,0])
+        a = np.linalg.norm(self.unitcell.cell_vec[0])
+        b = np.linalg.norm(self.unitcell.cell_vec[1])
+        c = np.linalg.norm(self.unitcell.cell_vec[2])
+        vol = np.linalg.det(self.unitcell.cell_vec)
+        jac = self.unitcell.cell_vec*np.outer(np.array((1./a,1./b,1./c)),np.ones(3))
+        jac_det = np.linalg.det(jac)
         den_yz = trapz(self.density,dx=float(1./ngx),axis=0)
         den_z = trapz(den_yz,dx=float(1./ngy),axis=0)
-        return den_z
+        avg_den = trapz(den_z,dx=float(1./ngz),axis=0)
+        avg_den = avg_den/jac_det/vol
+        return avg_den
 
     def macro_avg_z(self,lat_const=None):
         """
@@ -211,5 +238,5 @@ class ChargeDensity():
         return z_pos,diff
 
 if __name__ == "__main__":
-    pass
+    a = ChargeDensity("LOCPOT")
 
