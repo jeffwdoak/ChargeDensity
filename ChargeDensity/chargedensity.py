@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# ChargeDensity Class v0.1 09-19-2012 Jeff Doak jeff.w.doak@gmail.com
+# ChargeDensity Class v1.0 07-19-2014 Jeff Doak jeff.w.doak@gmail.com
 
 # Changelog:
 
@@ -228,7 +228,43 @@ class ChargeDensity():
         spline_dens = UnivariateSpline(z_pos,dens,s=0)
         return spline_dens
 
-    def dens_diff_z(self,dens1,dens2):
+    def interpolate(self,point):
+        """
+        Finds the density at an arbitrary point in direct coordinates by
+        tri-linear interpolation of the surrounding density values.
+        """
+        # From Scott Kirklin
+        # Make sure the point is located within the interior of the unit cell.
+        point = [ p%1 for p in point ]
+        point = [ p%1 for p in point ]
+        # Find lower bounding points x0,y0,z0
+        x0,y0,z0 = (int(np.floor(point[0]*self.mesh[0])),
+                    int(np.floor(point[1]*self.mesh[1])),
+                    int(np.floor(point[2]*self.mesh[2])))
+        # Find upper bounding points x1,y1,z1
+        x1,y1,z1 = ((x0+1)%self.mesh[0],
+                    (y0+1)%self.mesh[1],
+                    (z0+1)%self.mesh[2])
+        # We now have the bouding points: (x0,y0,z0), (x1,y0,z0), (x0,y1,z0),
+        # (x0,y0,z1), (x1,y1,z0), (x1,y0,z1), (x0,y1,z1), (x1,y1,z1) that form a
+        # box surrounding point. Now find the fractional position of point in
+        # the boundiing box.
+        x,y,z   =  ((point[0]*self.mesh[0])%1,
+                    (point[1]*self.mesh[1])%1,
+                    (point[2]*self.mesh[2])%1)
+        # The interpolated value is a linear combination of the values at each
+        # corner of the box.
+        interp_val = (self.density[x0,y0,z0]*(1-x)*(1-y)*(1-z) +
+                      self.density[x1,y0,z0]*x*(1-y)*(1-z) +
+                      self.density[x0,y1,z0]*(1-x)*y*(1-z) +
+                      self.density[x0,y0,z1]*(1-x)*(1-y)*z +
+                      self.density[x1,y1,z0]*x*y*(1-z) +
+                      self.density[x1,y0,z1]*x*(1-y)*z +
+                      self.density[x0,y1,z1]*(1-x)*y*z +
+                      self.density[x1,y1,z1]*x*y*z)
+        return interp_val
+
+   dens_diff_z(self,dens1,dens2):
         """
         Takes the difference between two 1-d densities using the grid spacing
         corresponding to dens1. Assumes dens1 and dens2 are splines.
@@ -236,6 +272,83 @@ class ChargeDensity():
         z_pos = np.linspace(0,self.unitcell.cell_vec[2,2],200)
         diff = dens2(z_pos) - dens1(z_pos)
         return z_pos,diff
+
+    def spherical_average(self,center,r_max,n_pts=10):
+        """
+        Averages the density in a sphere around the point center. Returns an
+        array containing the spherically averaged density over a series of
+        shells with increasing radii centered at the point center.
+        """
+        # Physics notation for spherical coordinates are use:
+        # rho - radial distance
+        # theta - inclination
+        # phi - azimuthal angle
+        from scipy.integrate import dblquad
+        def func(theta,phi,rho,center,dens):
+            """
+            Function to find the value of the density at a point equal to
+            center+Vector(rho).
+            """
+            # Determine direct rectilinear coordinates relative to center from
+            # spherical coordinates away from center.
+            rho_x = rho*np.cos(phi)*np.sin(theta)
+            rho_y = rho*np.sin(phi)*np.sin(theta)
+            rho_z = rho*np.cos(theta)
+            # Determine absolute direct coordinates from relative coordinates
+            # and center.
+            r_x = rho_x + center[0]
+            r_y = rho_y + center[1]
+            r_z = rho_z + center[2]
+            # Find the value of the density at the point r.
+            val = dens.interpolate([r_x,r_y,r_z])
+            # Weight the value by the spherical coordinate Jacobian.
+            val = val*rho*rho*np.sin(theta)
+            return val
+
+        r_list = np.linspace(0,r_max,n_pts)
+        val_list = np.zeros_like(r_list)
+        for i in range(len(r_list)):
+            rho = r_list[i]
+            integral,error = dblquad(func,0,2*np.pi,lambda g:0, lambda h: np.pi,
+                                     args=(rho,center,self))
+            val_list[i] = integral
+        return r_list,val_list
+
+    def spherical_vol_avg(self,center,r_max):
+        """
+        Averages the density over the volume of a sphere centered at the point
+        center, with a radis r_max.
+        """
+        # Physics notation for spherical coordinates are use:
+        # rho - radial distance
+        # theta - inclination
+        # phi - azimuthal angle
+        from scipy.integrate import tplquad
+        def func(theta,phi,rho,center,dens):
+            """
+            Function to find the value of the density at a point equal to
+            center+Vector(rho).
+            """
+            # Determine direct rectilinear coordinates relative to center from
+            # spherical coordinates away from center.
+            rho_x = rho*np.cos(phi)*np.sin(theta)
+            rho_y = rho*np.sin(phi)*np.sin(theta)
+            rho_z = rho*np.cos(theta)
+            # Determine absolute direct coordinates from relative coordinates
+            # and center.
+            r_x = rho_x + center[0]
+            r_y = rho_y + center[1]
+            r_z = rho_z + center[2]
+            # Find the value of the density at the point r.
+            val = dens.interpolate([r_x,r_y,r_z])
+            # Weight the value by the spherical coordinate Jacobian.
+            val = val*rho*rho*np.sin(theta)
+            return val
+
+        integral,error = tplquad(func,0,r_max,lambda a:0,lambda b:2*np.pi,
+                                 lambda c,d:0,lambda e,f: np.pi,args=(center,self))
+        return integral
+
 
 if __name__ == "__main__":
     a = ChargeDensity("LOCPOT")

@@ -1,16 +1,16 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 
 # avg_locpot_along_z.py v1.0 9-18-2012 Jeff Doak jeff.w.doak@gmail.com
 
-from unitcell import *
+from chargedensity import *
 import numpy as np
 import sys
 
 locfile = str(sys.argv[1])
-loc = open(locfile,'r')
-locpot = UnitCell()
-locpot.read_poscar(loc,vel=False)
-locpot.read_chgcar(loc)
+#loc = open(locfile,'r')
+locpot = ChargeDensity(locfile)
+#locpot.read_poscar(loc,vel=False)
+#locpot.read_chgcar(loc)
 den_z = locpot.integrate_z_density()
 # Read in lower and upper bounds for average
 if len(sys.argv) > 2:
