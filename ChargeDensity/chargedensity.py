@@ -132,14 +132,11 @@ class ChargeDensity():
         """
         from scipy.integrate import simps
         den = self.periodize_den_xy()
-        #den = self.density
         (nx,ny,nz) = np.shape(den)
         a = np.linalg.norm(self.unitcell.cell_vec[0])
         b = np.linalg.norm(self.unitcell.cell_vec[1])
         den_yz = simps(den,dx=float(a/(nx-1)),axis=0)/a
         den_z = simps(den_yz,dx=float(b/(ny-1)),axis=0)/b
-        #den_yz = simps(self.density,dx=float(a/nx),axis=0)/a
-        #den_z = simps(den_yz,dx=float(b/ny),axis=0)/b
         return den_z
 
     def avg_density_vol(self):
@@ -147,8 +144,6 @@ class ChargeDensity():
         Averages the density over the entire volume of the calculation cell.
         """
         from scipy.integrate import trapz
-        #den = self.density
-        #(nx,ny,nz) = np.shape(den)
         den = self.periodize_density()
         (nx,ny,nz) = np.shape(den)
         self.unitcell.scale = 1.0
@@ -161,11 +156,8 @@ class ChargeDensity():
         den_yz = trapz(den,dx=float(1./(nx-1)),axis=0)
         den_z = trapz(den_yz,dx=float(1./(ny-1)),axis=0)
         avg_den = trapz(den_z,dx=float(1./(nz-1)),axis=0)
-        avg_den1 = avg_den/jac_det/vol
-        avg_den2 = avg_den*jac_det/vol
-        avg_den3 = avg_den/jac_det
-        avg_den4 = avg_den*jac_det
-        return avg_den,avg_den1,avg_den2,avg_den3,avg_den4
+        avg_den = avg_den*jac_det/vol
+        return avg_den
 
     def macro_avg_z(self,lat_const=None):
         """
