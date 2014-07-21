@@ -19,15 +19,30 @@ class ChargeDensity():
     """
 
     def __init__(self,input_=None,format_=None):
+        """
+        ChargeDensity(input_,format_)
+            input_ - Can be a ChargeDensity object, a string representing a file
+            name containing a CHGCAR or LOCPOT formatted file, a file-type
+            object containing density data in the format of a CHGCAR file, or
+            None.
+            format_ - can be None, locpot, or chgcar. Determines whether or not
+            to divide the data in the file by the volume of the unit cell. None
+            and locpot do not divide the data, while chgcar does.
+        """
         self.unitcell = UnitCell()
-        if isinstance(input_,str):
+        if isinstance(input_,ChargeDensity):
+            # Return a new ChargeDensity object that is a copy of input_
+            self.unitcell = UnitCell(input_.unitcell)
+            self.density = input_.density
+        elif isinstance(input_,str):
             try:
                 input_ = open(input_,'r')
             except IOError:
                 print "Error reading input file."
                 print "Empty ChargeDensity will be returned."
                 input_ = None
-        if isinstance(input_,file):
+        #if isinstance(input_,file):
+        if input_ is not None:
             if format_ == None or format_ == "locpot":
                 self.unitcell.read_poscar(input_,vel=False)
                 self.read_chgcar(input_)
@@ -39,10 +54,9 @@ class ChargeDensity():
                 print "Unknown format."
                 print "Empty ChargeDensity will be returned."
                 input_ = None
-        elif isinstance(input_,ChargeDensity):
-            # Return a new ChargeDensity object that is a copy of input_
-            self.unitcell = UnitCell(input_.unitcell)
-            self.density = input_.density
+        if input_ is None:
+            # Create empty chargedensity.
+            self.density = np.zeros((1,1,1))
 
     def read_chgcar(self,input_):
         """
@@ -80,20 +94,52 @@ class ChargeDensity():
             scale = 1.0/np.linalg.det(self.unitcell.cell_vec)
         self.density = self.density*scale
 
+    def periodize_density(self):
+        """
+        Returns a copy of the density with increased size (nx+1,ny+1,nz+1) with
+        density[:,:,-1] = density[:,:,0], density[:,-1,:] = density[:,0,:],
+        and density[-1,:,:] density[0,:,:], making the density function periodic
+        in and of itself. This is important for integrating the density over the
+        volume of the unit cell.
+        """
+        (nx,ny,nz) = np.shape(self.density)
+        per_density = np.zeros((nx+1,ny+1,nz+1))
+        per_density[0:nx,0:ny,0:nz] = self.density
+        per_density[-1,:,:] = per_density[0,:,:]
+        per_density[:,-1,:] = per_density[:,0,:]
+        per_density[:,:,-1] = per_density[:,:,0]
+        return per_density
+
+    def periodize_den_xy(self):
+        """
+        Returns a copy of the density with increased size (nx+1,ny+1,nz) with
+        density[-1,:,:] = density[0,:,:], and density[:,-1,:] =  density[:,0,:],
+        making the density function periodic in and of itself along x and y.
+        This is important for integrating the density in the x-y plane.
+        """
+        (nx,ny,nz) = np.shape(self.density)
+        per_density = np.zeros((nx+1,ny+1,nz))
+        per_density[0:nx,0:ny,0:nz] = self.density
+        per_density[-1,:,:] = per_density[0,:,:]
+        per_density[:,-1,:] = per_density[:,0,:]
+        return per_density
+
     def integrate_z_density(self):
         """
         Returns a numpy array containing the density integrated in the xy-plane
         as a function of position along the z-axis. Uses the trapezoid rule to
         integrate the density.
         """
-        from scipy.integrate import trapz
-        ngx = len(self.density)
-        ngy = len(self.density[0])
-        ngz = len(self.density[0,0])
+        from scipy.integrate import simps
+        den = self.periodize_den_xy()
+        #den = self.density
+        (nx,ny,nz) = np.shape(den)
         a = np.linalg.norm(self.unitcell.cell_vec[0])
         b = np.linalg.norm(self.unitcell.cell_vec[1])
-        den_yz = trapz(self.density,dx=float(a/ngx),axis=0)/a
-        den_z = trapz(den_yz,dx=float(b/ngy),axis=0)/b
+        den_yz = simps(den,dx=float(a/(nx-1)),axis=0)/a
+        den_z = simps(den_yz,dx=float(b/(ny-1)),axis=0)/b
+        #den_yz = simps(self.density,dx=float(a/nx),axis=0)/a
+        #den_z = simps(den_yz,dx=float(b/ny),axis=0)/b
         return den_z
 
     def avg_density_vol(self):
@@ -101,20 +147,25 @@ class ChargeDensity():
         Averages the density over the entire volume of the calculation cell.
         """
         from scipy.integrate import trapz
-        ngx = len(self.density)
-        ngy = len(self.density[0])
-        ngz = len(self.density[0,0])
+        #den = self.density
+        #(nx,ny,nz) = np.shape(den)
+        den = self.periodize_density()
+        (nx,ny,nz) = np.shape(den)
+        self.unitcell.scale = 1.0
         a = np.linalg.norm(self.unitcell.cell_vec[0])
         b = np.linalg.norm(self.unitcell.cell_vec[1])
         c = np.linalg.norm(self.unitcell.cell_vec[2])
         vol = np.linalg.det(self.unitcell.cell_vec)
         jac = self.unitcell.cell_vec*np.outer(np.array((1./a,1./b,1./c)),np.ones(3))
         jac_det = np.linalg.det(jac)
-        den_yz = trapz(self.density,dx=float(1./ngx),axis=0)
-        den_z = trapz(den_yz,dx=float(1./ngy),axis=0)
-        avg_den = trapz(den_z,dx=float(1./ngz),axis=0)
-        avg_den = avg_den/jac_det/vol
-        return avg_den
+        den_yz = trapz(den,dx=float(1./(nx-1)),axis=0)
+        den_z = trapz(den_yz,dx=float(1./(ny-1)),axis=0)
+        avg_den = trapz(den_z,dx=float(1./(nz-1)),axis=0)
+        avg_den1 = avg_den/jac_det/vol
+        avg_den2 = avg_den*jac_det/vol
+        avg_den3 = avg_den/jac_det
+        avg_den4 = avg_den*jac_det
+        return avg_den,avg_den1,avg_den2,avg_den3,avg_den4
 
     def macro_avg_z(self,lat_const=None):
         """
@@ -264,7 +315,7 @@ class ChargeDensity():
                       self.density[x1,y1,z1]*x*y*z)
         return interp_val
 
-   dens_diff_z(self,dens1,dens2):
+    def dens_diff_z(self,dens1,dens2):
         """
         Takes the difference between two 1-d densities using the grid spacing
         corresponding to dens1. Assumes dens1 and dens2 are splines.

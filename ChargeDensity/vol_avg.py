@@ -19,9 +19,16 @@ else:
 
 avg1 = a.avg_density_vol()
 avg2 = np.average(a.density)
+A = np.linalg.norm(a.unitcell.cell_vec[0])
+B = np.linalg.norm(a.unitcell.cell_vec[1])
+C = np.linalg.norm(a.unitcell.cell_vec[2])
+area = A*B
+
 
 print "avg1",avg1
 print "avg2",avg2
+print area
+print A,B,C
 
 
 
