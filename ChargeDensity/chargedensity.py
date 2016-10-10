@@ -271,30 +271,28 @@ class ChargeDensity():
         spline_dens = UnivariateSpline(z_pos,dens,s=0)
         return spline_dens
 
-    def interpolate(self,point):
+    def interpolate(self, point):
         """
         Finds the density at an arbitrary point in direct coordinates by
         tri-linear interpolation of the surrounding density values.
         """
         # From Scott Kirklin
         # Make sure the point is located within the interior of the unit cell.
+        point = [ p%1 for p in point ]  # Fractional coords. of unit cell.
         point = [ p%1 for p in point ]
-        point = [ p%1 for p in point ]
-        # Find lower bounding points x0,y0,z0
-        x0,y0,z0 = (int(np.floor(point[0]*self.density[0])),
-                    int(np.floor(point[1]*self.density[1])),
-                    int(np.floor(point[2]*self.density[2])))
-        # Find upper bounding points x1,y1,z1
-        x1,y1,z1 = ((x0+1)%self.density[0],
-                    (y0+1)%self.density[1],
-                    (z0+1)%self.density[2])
+        # Find shape of mesh in x, y, and z directions.
+        (nx,ny,nz) = np.shape(self.density)
+        # Find lower bounding indices x0, y0, z0, of mesh
+        x0, y0, z0 = (int(np.floor(point[0]*nx)), int(np.floor(point[1]*ny)),
+                      int(np.floor(point[2]*nz)))
+        # Find upper bounding indices x1, y1, z1
+        x1, y1, z1 = ((x0+1)%nx, (y0+1)%ny, (z0+1)%nz)
         # We now have the bouding points: (x0,y0,z0), (x1,y0,z0), (x0,y1,z0),
         # (x0,y0,z1), (x1,y1,z0), (x1,y0,z1), (x0,y1,z1), (x1,y1,z1) that form a
         # box surrounding point. Now find the fractional position of point in
         # the boundiing box.
-        x,y,z   =  ((point[0]*self.density[0])%1,
-                    (point[1]*self.density[1])%1,
-                    (point[2]*self.density[2])%1)
+        x, y, z = ((point[0]*self.density[0])%1, (point[1]*self.density[1])%1,
+                   (point[2]*self.density[2])%1) 
         # The interpolated value is a linear combination of the values at each
         # corner of the box.
         interp_val = (self.density[x0,y0,z0]*(1-x)*(1-y)*(1-z) +
