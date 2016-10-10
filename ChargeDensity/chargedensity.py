@@ -281,20 +281,20 @@ class ChargeDensity():
         point = [ p%1 for p in point ]
         point = [ p%1 for p in point ]
         # Find lower bounding points x0,y0,z0
-        x0,y0,z0 = (int(np.floor(point[0]*self.mesh[0])),
-                    int(np.floor(point[1]*self.mesh[1])),
-                    int(np.floor(point[2]*self.mesh[2])))
+        x0,y0,z0 = (int(np.floor(point[0]*self.density[0])),
+                    int(np.floor(point[1]*self.density[1])),
+                    int(np.floor(point[2]*self.density[2])))
         # Find upper bounding points x1,y1,z1
-        x1,y1,z1 = ((x0+1)%self.mesh[0],
-                    (y0+1)%self.mesh[1],
-                    (z0+1)%self.mesh[2])
+        x1,y1,z1 = ((x0+1)%self.density[0],
+                    (y0+1)%self.density[1],
+                    (z0+1)%self.density[2])
         # We now have the bouding points: (x0,y0,z0), (x1,y0,z0), (x0,y1,z0),
         # (x0,y0,z1), (x1,y1,z0), (x1,y0,z1), (x0,y1,z1), (x1,y1,z1) that form a
         # box surrounding point. Now find the fractional position of point in
         # the boundiing box.
-        x,y,z   =  ((point[0]*self.mesh[0])%1,
-                    (point[1]*self.mesh[1])%1,
-                    (point[2]*self.mesh[2])%1)
+        x,y,z   =  ((point[0]*self.density[0])%1,
+                    (point[1]*self.density[1])%1,
+                    (point[2]*self.density[2])%1)
         # The interpolated value is a linear combination of the values at each
         # corner of the box.
         interp_val = (self.density[x0,y0,z0]*(1-x)*(1-y)*(1-z) +
